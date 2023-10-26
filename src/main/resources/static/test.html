@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/html">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <script src="https://ajax.aspnetcdn.com/ajax/jQuery/jquery-3.7.0.min.js"></script>
+</head>
+
+<body>
+<input type="text" id="positionName" style="width: 300px" readonly="readonly" />
+<input type="text" id="positionValue" style="display: none" readonly="readonly" />
+<br/>
+<input type="text" placeholder="请输入门店名称" style="width: 300px" id="searchName" /><input type="button" value="搜索" onclick="search()" /><br/> 请选择门店：
+<select id="store" style="width: 300px">
+</select>
+<br/>
+<input type="button" value="提交" onclick="search()" />
+<script>
+    var positionName = $("#positionName");
+    var positionValue = $("#positionValue");
+    var storeSelect = $("#store");
+    var latitude;
+    var longitude;
+
+    window.onload = function() {
+        // 给下拉框绑定监听事件
+        storeSelect.change(function() {
+            positionValue.val($(this).val());
+            positionName.val($(this).find("option:selected").text());
+            console.log($(this).val() + "--------" + $(this).find("option:selected").text());
+        })
+        // 1、拿到定位
+        // 1.1 获取ip地址
+        if(navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(showPosition, showError);
+        } else {
+            alert("您的浏览器不支持定位，请自己选择地址");
+        }
+    }
+
+    function showPosition(position) {
+        // 全局变量-经纬度
+        latitude = position.coords.latitude;
+        longitude = position.coords.longitude;
+
+        // 根据定位结果 请求到后台 用ajax
+        $.ajax({
+            url: "/findLocation",
+            method: "post",
+            dataType: "json",
+            data: {
+                'position': JSON.stringify({
+                    // 纬度
+                    'latitude': position.coords.latitude,
+                    // 精度
+                    'longitude': position.coords.longitude,
+                    'accuracy': position.coords.accuracy,
+                    'altitude': position.coords.altitude,
+                    'altitudeAccuracy': position.coords.altitudeAccuracy,
+                    'heading': position.coords.heading,
+                    'speed': position.coords.speed
+                })
+            }
+        }).done((data)=>{
+            searchSuccess(data)
+        });
+    }
+
+    function showError(error) {
+        switch(error.code) {
+            case error.PERMISSION_DENIED:
+                x.innerHTML = "用户拒绝对获取地理位置的请求。"
+                break;
+            case error.POSITION_UNAVAILABLE:
+                x.innerHTML = "位置信息是不可用的。"
+                break;
+            case error.TIMEOUT:
+                x.innerHTML = "请求用户地理位置超时。"
+                break;
+            case error.UNKNOWN_ERROR:
+                x.innerHTML = "未知错误。"
+                break;
+        }
+    }
+
+    function search() {
+        // 获取查询的名称
+        let searchName = $("#searchName").val();
+        $.ajax({
+            url: "/findLocationBySearchName",
+                method: "post",
+                dataType: "json",
+                data: {
+                'searchParams': JSON.stringify({
+                    // 纬度
+                    'latitude': latitude,
+                    // 精度
+                    'longitude': longitude,
+                    'searchName': searchName
+                })
+            }
+        })
+        .done((data)=>{
+            searchSuccess(data)
+        });
+    }
+
+    function searchSuccess(data) {
+        console.log(data);
+        storeSelect.empty();
+        positionValue.attr("value","");
+        positionName.attr("value","");
+        // 处理完成的返回结果
+        $.each(data, function(index, store) {
+            if(0 === index) {
+                // 显示最近的一个肯德基
+                positionValue.attr("value", store.id);
+                positionName.attr("value", store.name);
+                storeSelect.append("<option value=" + store.id + " selected=\"selected\">" + store.name + "</option>");
+            } else {
+                storeSelect.append("<option value=" + store.id + " >" + store.name + "</option>");
+            }
+        });
+    }
+</script>
+</body>
+
+</html>
